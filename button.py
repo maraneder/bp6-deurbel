@@ -2,6 +2,7 @@ import RPi.GPIO as GPIO
 import Adafruit_CharLCD as LCD
 import os
 import time
+import sys
 
 login = "login" #gebruikersnaam hier invullen
 ww = "ww" #wachtwoord hier invullen
@@ -27,7 +28,6 @@ LCD_BACKLIGHT = 0
 lcd = LCD.Adafruit_CharLCD(LCD_RS, LCD_E, LCD_D4, LCD_D5, LCD_D6, LCD_D7, LCD_COLUMNS, LCD_ROWS, LCD_BACKLIGHT)
  
 
-version="/home/pi/deurbel/deurbel.py"
 os.environ['TZ'] = 'Europe/Amsterdam'
 now = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
 db = "false"
@@ -51,6 +51,48 @@ def DoorbellPressed(channel):
     time.sleep(3)  # houd led aan voor 3 seconden
     GPIO.output(LED_PIN, GPIO.LOW)
 
+    writeTodatabase() # sla op in database dat er aangebeld is
+
+
+
+# opslaan in database
+def writeTodatabase():
+    now = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+    try:
+        con = mdb.connect(host='localhost', user=login, password=ww, database=database)
+        db="true"
+        with con:
+            cur = con.cursor()
+            cur.execute("INSERT INTO deurbel(tijd) VALUES (%s)", (now,))
+	    con.commit()
+            print("Data weggeschreven in database ")
+	    cur.close()
+    except:
+        print('Er is geen verbinding met de database')
+        print("Unexpected error:", sys.exc_info()[0])
+        db="false"
+
+# haal laatste twee timestamps op uit de database
+def getLastTwoEntries():
+    try:
+        con = mdb.connect(host='localhost', user=login, password=ww, database=database)
+        with con:
+            cur = con.cursor()
+            cur.execute("SELECT tijd FROM deurbel ORDER BY tijd DESC LIMIT 2")
+            rows = cur.fetchall()  # haal laatste twee rijen
+            cur.close()
+            return [str(row[0]) for row in rows] if rows else ["No Data", "Check DB"]
+    except Exception as e:
+        print("Database Error:", e)
+        return ["No Data", "Check DB"]
+    
+
+# update lcd met laatste twee timestamps
+def updateLcd():
+    records = getLastTwoEntries()
+    lcd.clear()
+    lcd.message("{}\n{}".format(records[0], records[1]))  # laat laatste twee entries zien
+
 
 
 
@@ -62,6 +104,7 @@ GPIO.add_event_detect(BUTTON_PIN, GPIO.RISING, callback=DoorbellPressed, bouncet
 
 try:
     while True:
+	updateLcd()
         time.sleep(1)
 except KeyboardInterrupt:
     print("Stopping program.")
