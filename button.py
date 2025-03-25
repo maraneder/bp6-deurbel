@@ -38,3 +38,32 @@ GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(BUTTON_PIN, GPIO.IN)  # om te zorgen dat het induwen is
 GPIO.setup(LED_PIN, GPIO.OUT) 
+
+
+# deurbel indrukken
+def DoorbellPressed(channel):
+    global now
+    now = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+    print(now)
+    print("Button Pressed")
+
+    GPIO.output(LED_PIN, GPIO.HIGH)  # zet led aan
+    time.sleep(3)  # houd led aan voor 3 seconden
+    GPIO.output(LED_PIN, GPIO.LOW)
+
+
+
+
+# main loop
+print("Program started.")
+print("Control-C om te stoppen")
+
+GPIO.add_event_detect(BUTTON_PIN, GPIO.RISING, callback=DoorbellPressed, bouncetime=200)
+
+try:
+    while True:
+        time.sleep(1)
+except KeyboardInterrupt:
+    print("Stopping program.")
+    lcd.clear()
+    GPIO.cleanup()
