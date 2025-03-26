@@ -45,6 +45,8 @@ GPIO.setup(LCD_D5, GPIO.OUT)
 GPIO.setup(LCD_D6, GPIO.OUT)
 GPIO.setup(LCD_D7, GPIO.OUT)
 
+last_pressed_time = None
+
 def lcd_init():
     lcd_command(0x33)  
     lcd_command(0x32) 
@@ -65,7 +67,7 @@ GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(BUTTON_PIN, GPIO.IN)  # om te zorgen dat het induwen is
 GPIO.setup(LED_PIN, GPIO.OUT) 
-GPIO.setup(LCD_BUTTON, GPIO.IN)
+GPIO.setup(LCD_BUTTON, GPIO.IN, GPIO.PUD_UP)
 
 
 # deurbel indrukken
@@ -92,20 +94,28 @@ def doorbellPressed(channel):
 
 # opslaan in database
 def writeTodatabase():
+    # zorg dat de button niet dubbel doorgeeft
+    # dus maar een keer per minuut opslaan
+    global last_pressed_time
     now = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
-    try:
-        con = mdb.connect(host='localhost', user=login, password=ww, database=database)
-        db="true"
-        with con:
-            cur = con.cursor()
-            cur.execute("INSERT INTO deurbel(tijd) VALUES (%s)", (now,))
-	    con.commit()
-            print("Data weggeschreven in database ")
-	    cur.close()
-    except:
-        print('Er is geen verbinding met de database')
-        print("Unexpected error:", sys.exc_info()[0])
-        db="false"
+    current_minute = now[:16]
+
+    if last_pressed_time is None or current_minute != last_pressed_time:
+        try:
+            con = mdb.connect(host='localhost', user=login, password=ww, database=database)
+            db="true"
+            with con:
+                cur = con.cursor()
+                cur.execute("INSERT INTO deurbel(tijd) VALUES (%s)", (now,))
+	        con.commit()
+                print("Data weggeschreven in database ")
+	        cur.close()
+        except:
+            print('Er is geen verbinding met de database')
+            print("Unexpected error:", sys.exc_info()[0])
+            db="false"
+    else: 
+        print("Button pressed within same minute, skipping database write")
 
 
 
@@ -177,8 +187,8 @@ def historyPressed(channel):
 
     if len(timestamps) == 2:
         # toon op display
-        lcd_display("Last Press: {}".format(timestamps[0][0]), 1)  
-        lcd_display("Prev Press: {}".format(timestamps[1][0]), 2)  
+        lcd_display("{}".format(timestamps[0][0]), 1)
+        lcd_display("{}".format(timestamps[1][0]), 2)
     else:
         # als er een of minder zijn
         lcd_display("No timestamps found", 1)
@@ -198,8 +208,8 @@ print(time.strftime('%d-%m-%Y %H:%M:%S', time.localtime()))
 print("Program started.")
 print("Control-C om te stoppen")
 
-GPIO.add_event_detect(LCD_BUTTON, GPIO.RISING, callback=historyPressed, bouncetime=200)
-GPIO.add_event_detect(BUTTON_PIN, GPIO.RISING, callback=doorbellPressed, bouncetime=200)
+GPIO.add_event_detect(LCD_BUTTON, GPIO.RISING, callback=historyPressed, bouncetime=1000)
+GPIO.add_event_detect(BUTTON_PIN, GPIO.RISING, callback=doorbellPressed, bouncetime=1000)
 
 
 try:
