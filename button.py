@@ -9,6 +9,7 @@ import smtplib
 import urllib
 from itertools import cycle
 from time import sleep
+import subprocess
 
 login = "login" #gebruikersnaam hier invullen
 ww = "ww" #wachtwoord hier invullen
@@ -91,6 +92,8 @@ def doorbellPressed(channel):
 
     writeTodatabase()
 
+    # aanroepen functie om lamp te laten knipperen
+    subprocess.call(["/home/Mara/lamp-venv/bin/python", "/home/Mara/blue/hue/lamp_blink.py"])
 
 # opslaan in database
 def writeTodatabase():
@@ -103,7 +106,6 @@ def writeTodatabase():
     if last_pressed_time is None or current_minute != last_pressed_time:
         try:
             con = mdb.connect(host='localhost', user=login, password=ww, database=database)
-            db="true"
             with con:
                 cur = con.cursor()
                 cur.execute("INSERT INTO deurbel(tijd) VALUES (%s)", (now,))
